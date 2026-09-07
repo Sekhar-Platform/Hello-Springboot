@@ -50,6 +50,40 @@ jobs:
 
 
       # -----------------------------------------
+      # TEMPORARY: Debug GitHub OIDC claims
+      # -----------------------------------------
+      - name: Debug GitHub OIDC claims
+        shell: bash
+        run: |
+          echo "Reading GitHub OIDC claims..."
+
+          RESPONSE=$(curl -sS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
+
+          TOKEN=$(echo "$RESPONSE" | jq -r '.value')
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "ERROR: Could not obtain OIDC token"
+            exit 1
+          fi
+
+          # Print claims only - NEVER print the complete token
+          PAYLOAD=$(echo "$TOKEN" | cut -d '.' -f2 | base64 -d 2>/dev/null || true)
+
+          echo "$PAYLOAD" | jq '{
+            iss,
+            aud,
+            sub,
+            repository,
+            repository_id,
+            repository_owner,
+            repository_owner_id,
+            ref
+          }'
+
+
+      # -----------------------------------------
       # 4. Configure AWS credentials using OIDC
       # -----------------------------------------
       - name: Configure AWS credentials using OIDC
@@ -110,4 +144,4 @@ jobs:
       - name: Display ECR image
         run: |
           echo "Image pushed successfully:"
-          echo "${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}"
+          echo "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
